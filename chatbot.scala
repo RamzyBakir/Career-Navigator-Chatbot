@@ -1,8 +1,13 @@
+import java.io._
+import java.util.Date
+import java.text.SimpleDateFormat
 import scala.io.Source
 import scala.io.StdIn._
 import scala.annotation.tailrec
 import scala.annotation.meta.field
 import scala.util.Random
+import scala.annotation.retains
+
 
 val responseTemplates = List(
     "Based on your input, here are some careers and roles that might interest you:\n{roles}.",
@@ -21,6 +26,7 @@ val careersAndRolesMap = Map(
         "c++" -> List("C++ Developer", "Software Engineer", "Game Developer", "Systems Programmer"),
         "cpp" -> List("C++ Developer", "Software Engineer", "Game Developer", "Systems Programmer"),
         "c#" -> List(".NET Developer", "Software Engineer", "Backend Developer"),
+        ".net" -> List(".NET Developer", "Software Engineer", "Web Developer"),
         "swift" -> List("iOS Developer", "Swift Developer", "Mobile App Developer"),
         "go" -> List("Go Developer", "Backend Developer", "Cloud Engineer"),
         "ruby" -> List("Ruby Developer", "Web Developer", "Backend Developer"),
@@ -157,6 +163,7 @@ val careersAndRolesMap = Map(
         "networking" -> List("Network Engineer", "Security Engineer", "DevOps Engineer"),
         "networks" -> List("Network Engineer", "Security Engineer", "DevOps Engineer"),
         "cybersecurity" -> List("Cybersecurity Engineer", "Security Analyst", "Security Consultant"),
+        "security" -> List("Cybersecurity Engineer", "Security Analyst", "Security Consultant"),
         "infosec" -> List("Cybersecurity Engineer", "Security Analyst", "Security Consultant"),
         "embedded" -> List("Embedded Systems Engineer", "Hardware Engineer", "Firmware Engineer"),
         "systems" -> List("Systems Engineer", "System Administrator", "DevOps Engineer"),
@@ -219,10 +226,34 @@ var userSuggestedRandC: List[String] = List()
 
 
 def greetUser(): String = {
-    "Hello, I'm your personalized tech career and job chatbot advisor! \n"+"Let's start by knowing what type of skills do you have? Programming languages you enjoy, field of intrest and such..."
+    "Hi there! I'm Career Navigator, your tech career advisor.\nI can help you identify your skills, explore career paths, and navigate the job search."
 }
+
+def storeUserPreferences(userInput: String, botResponse: String): Unit = {
+    val folderPath = "conversations"
+    val timestamp = new SimpleDateFormat("ddMMyyyy").format(new Date())
+    val chatHistoryFilePath = s"$folderPath/chat_history_$timestamp.txt"
+
+    try {
+        // Create the folder if it doesn't exist
+        val folder = new File(folderPath)
+        if (!folder.exists()) {
+            folder.mkdir()
+        }
+
+        // Open the file in append mode and write the user input and bot response
+        val chatHistoryWriter = new BufferedWriter(new FileWriter(chatHistoryFilePath, true))
+        chatHistoryWriter.write("USER: " + userInput + "\n")
+        chatHistoryWriter.write("BOT: " + botResponse + "\n\n")
+        chatHistoryWriter.close()
+    } catch {
+        case e: IOException =>
+            println("Error storing chat history: " + e.getMessage)
+    }
+}
+
 def parseInput(input: String): List[String] = {
-    var parseList: List[String] = input.replaceAll("[^a-zA-Z]", " ").toLowerCase.split(' ').toList
+    var parseList: List[String] = input.replaceAll("[^a-zA-Z#+]", " ").toLowerCase.split(' ').toList
     parseList = parseList.filter(_.nonEmpty)
     if (input.nonEmpty && input.last == '?') parseList = parseList.dropRight(1)
     val programming_languages = List("python", "py", "java", "javascript", "c++", "cpp", "c#", 
@@ -250,7 +281,7 @@ def parseInput(input: String): List[String] = {
         "vision", "cv", "image", "processing", "ip", "database", "management", "databases", "sql", 
         "nosql", "big", "data", "data", "mining", "data", "visualization", "dv", "parallel", 
         "computing", "concurrent", "programming", "parallelism", "concurrency", "operating", "systems", 
-        "os", "networking", "network", "protocols", "cloud", "computing", "distributed", "systems", 
+        "os", "networking", "network", "protocols", "cloud", "computing", "distributed", "systems", "security", 
         "cybersecurity", "infosec", "cryptography", "encryption", "blockchain", "web", "development", 
         "frontend", "development", "backend", "development", "full-stack", "development", "software", 
         "testing", "testing", "agile", "methodologies", "agile", "version", "control", "git")
@@ -267,20 +298,20 @@ def parseInput(input: String): List[String] = {
         "resolution", "customer", "service", "user", "experience", "design", "ux", "design")
 
     val tokens = parseList.filter(word => 
-        programming_languages.contains(word) || 
-        fields.contains(word) || 
-        topics.contains(word) || 
-        skills.contains(word))
+        programming_languages.contains(word)
+        || fields.contains(word) 
+        || topics.contains(word)
+        || skills.contains(word))
     tokens
 }
 
 def generateResponse(query: String): String = {
     val infoKeywords = List("description", "information", "info", "details", "more", "what", "explain", "tell","overview", "about", "learn", "understand")
     var containsInfoKeywords: List[String] = List()
-    infoKeywords.foreach { keyword =>if (query.toLowerCase.contains(keyword.toLowerCase)) {containsInfoKeywords = containsInfoKeywords :+ keyword}}
+    infoKeywords.foreach { keyword =>if (query.replaceAll("[^a-zA-Z#+]", " ").toLowerCase.contains(keyword.toLowerCase)) {containsInfoKeywords = containsInfoKeywords :+ keyword}}
     var roleName = ""
     for {l <- userSuggestedRandC 
-        start <- 0 until query.length - l.length + 1 if query.substring(start, start + l.length).equalsIgnoreCase(l)} { roleName = l}
+        start <- 0 until (query.length - l.length + 1) if query.substring(start, start + l.length).equalsIgnoreCase(l)} { roleName = l}
     val filename = "job_descriptions.csv"
     val lines = Source.fromFile(filename).getLines().toList
     val header = lines.head.split(",").map(_.trim)
@@ -291,43 +322,63 @@ def generateResponse(query: String): String = {
     val cols = line.split(",").map(_.trim)
     if (cols(jobTitleIndex).toLowerCase() == roleName.toLowerCase()) {description = cols(descriptionIndex)
     }}
-    if (roleName == "" && containsInfoKeywords.isEmpty && description == "")
+    if (roleName == "" && description == "")
         return ""
-    if (roleName != "" && containsInfoKeywords.nonEmpty && description != "")
-        description
+    if (roleName != "" && description != "")
+        "Certainly, a "+roleName+" "+description.replaceAll("\"", "")
     else s"Sorry, I couldn't find a description for $roleName."
 }
 
 def handleUserInput(input: String): String ={
-    val response = generateResponse(input)
-    if (response != "") {
+    var response = "Sorry, I couldn't find any matching careers or roles based on your input.\n"+
+            "Could you please provide information on the programming languages you're knowledgeable about," +
+            "your skill set, and the fields or topics within the tech industry that pique your interest?"
+    
+    val gratitudeKeywords = List("merci", "shokran", "thx", "thanks", "thank you", "appreciate", "grateful", "helpful", "awesome", "great", "fantastic", "wonderful", "amazing")
+    if (gratitudeKeywords.exists(keyword => input.replaceAll("[^a-zA-Z]", "").toLowerCase.contains(keyword))) {
+        response = "You're welcome! If you have any more questions or need further assistance, feel free to ask. :)"
+        storeUserPreferences(input,response)
         return response
-    }
+        }
+    
+    if (generateResponse(input) != "")
+        response = generateResponse(input)
+        storeUserPreferences(input,response)
+        return response
+    
     val tokens = parseInput(input)
+    if (tokens.isEmpty) return response
     
     val SuggestedCandR = tokens.flatMap { // WTF IS FLATMAP
         case token if careersAndRolesMap.contains(token) => careersAndRolesMap(token)
         case _ => List.empty[String]
     }
-
-    val occurrencesMap = SuggestedCandR.groupBy(identity).map { case (k, v) => k -> v.size }
-    userSuggestedRandC = userSuggestedRandC ++ occurrencesMap.filter { case (_, count) => count >= 1 }.keys.toList
+    userSuggestedRandC = userSuggestedRandC ++ SuggestedCandR
+    userSuggestedRandC = userSuggestedRandC.distinct
 
     if (userSuggestedRandC.nonEmpty) {
         val randomTemplate = Random.shuffle(responseTemplates).head
         val rolesList = userSuggestedRandC.map(role => s"  - $role").mkString("\n")
-        val response = randomTemplate.replace("{roles}", rolesList)
-        response + "\nPlease feel free to ask me about any role!"
+        response = randomTemplate.replace("{roles}", rolesList) + "\nPlease feel free to ask me about any role!"
+        storeUserPreferences(input,response)
+        response 
     } else {
-        "I couldn't find any matching careers or roles based on your input."
+        storeUserPreferences(input,response)
+        response
     }
 }
 @main def help(): Unit = {
     printf("USER =>")
     var userinput = readLine()
-    parseInput(userinput) match
-        case Nil => println(greetUser())
-        case _ => "7ot greet user mo5talefa hena\n" + println(handleUserInput(userinput))
+    parseInput(userinput) match {
+        case Nil =>
+            val greeting = greetUser()
+            println(greeting)
+            storeUserPreferences(userinput, greeting)
+        case _ =>
+            val userInteraction = handleUserInput(userinput)
+            println(userInteraction)
+            storeUserPreferences(userinput, userInteraction) }
     printf("USER =>")
     userinput = readLine()
     while(userinput.toLowerCase() != "exit"){

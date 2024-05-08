@@ -41,4 +41,4 @@ Designed with precision and efficiency in mind, Career-Navigator serves as your 
   - [@RamzyBakir](https://github.com/RamzyBakir)
   - [@YahiaSonbol](https://github.com/YahiaSonbol)
   - [@medo3alaa](https://github.com/medo3alaa)
-  - @YoussefHazem
+  - [@YoussefHazem](https://github.com/youssefeLsharaawy)

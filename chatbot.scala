@@ -13,6 +13,7 @@ import scala.collection.View.Empty
 
 
 
+
 var userSuggestedRandC: List[String] = List()
 
 
@@ -372,9 +373,6 @@ def generateResponse(query: String): String = {
     QualificationKeywords.foreach { keyword =>if (query.replaceAll("[^a-zA-Z]", " ").toLowerCase.contains(keyword.toLowerCase)) {containsQualificationKeywords = containsQualificationKeywords :+ keyword}}
 
     var roleName = ""
-
-    for {job <- userSuggestedRandC 
-        start <- 0 until (query.length - job.length + 1) if query.substring(start, start + job.length).equalsIgnoreCase(job)} { roleName = job}
     val filename = "datasets/jobs_DSQR.csv"
     val lines = Source.fromFile(filename).getLines().toList
     val header = lines.head.split(",").map(_.trim)
@@ -470,6 +468,7 @@ def communication(output: String): Unit = {
   writer.close()
 }
 
+
 @main def help(): Unit = {
   val startconvKeywords = List("hi","hello","good","morning","bonjour")
     while(true){
@@ -479,14 +478,14 @@ def communication(output: String): Unit = {
           var tokens: List[String] = userinput.replaceAll("[^a-zA-Z#+.]", " ").toLowerCase.split(' ').toList
           tokens = tokens.filter(_.nonEmpty)
           tokens = tokens.filter(word => startconvKeywords.contains(word))
-          tokens match {
-            case Nil =>
+          (tokens, parseInput(userinput)) match {
+            case (_,Nil) =>
+              communication(greetUser())
+              storeUserPreferences(userinput)
+            case (_,_) =>
               val userInteraction = handleUserInput(userinput)
               communication(userInteraction)
               storeUserPreferences(userinput) 
-            case _ =>
-              communication(greetUser())
-              storeUserPreferences(userinput)
       }
     }
   }
